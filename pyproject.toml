@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gbkomi"
+version = "1.4.1"
+description = "High-security encryption library for Python"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "GBKOMI", email = "qqqwwweeeshah@gmail.com"}
+]
+dependencies = []
+
+[tool.setuptools.packages.find]
+where = ["."]
