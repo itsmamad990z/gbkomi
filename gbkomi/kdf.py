@@ -1,17 +1,18 @@
-from argon2 import PasswordHasher
-from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
-from cryptography.hazmat.backends import default_backend
+import os
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
 
-def derive_key(password: str, length: int = 32) -> bytes:
-    password_bytes = password.encode()
-    salt = b"gbkomi_salt_2026"
-    kdf = Argon2id(
-        time_cost=3,
-        memory_cost=64*1024,
-        parallelism=4,
-        length=length,
+
+def derive_key(password: bytes, salt: bytes = None):
+    if salt is None:
+        salt = os.urandom(16)
+
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
         salt=salt,
-        backend=default_backend()
+        iterations=390000,
     )
-    return kdf.derive(password_bytes)
+
+    key = kdf.derive(password)
+    return key, salt
