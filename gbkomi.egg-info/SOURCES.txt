@@ -5,6 +5,7 @@ gbkomi/dbcrypto.py
 gbkomi/encryption.py
 gbkomi/exceptions.py
 gbkomi/filecrypto.py
+gbkomi/gblog.py
 gbkomi/gbtoken.py
 gbkomi/hashing.py
 gbkomi/kdf.py
