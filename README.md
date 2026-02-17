@@ -1,22 +1,72 @@
-# gbkomi v1.4.1
+# GBKomi v1.4.2
 
-**gbkomi** is a high-security Python library for encryption, hashing, secure database storage, and Telegram bot token management.  
+**GBKomi** is a high-security Python library for encryption, hashing, secure database storage, Telegram bot token management, and secure logging.  
+It is designed to provide **military-grade security** while remaining **user-friendly** for developers building bots, scripts, and applications.  
 
-It is designed for small to large projects and provides **industrial-strength encryption** tailored for secure Telegram bots.
+This version (v1.4.2) introduces **advanced multi-bot support**, retry/lockout mechanisms, context-aware token and log management, and fully misuse-resistant APIs for Telegram bots.
 
 ---
 
 ## 🔹 Key Features
 
----
+### 1️⃣ Military-Grade .gbtoken Security
+- AES-256-GCM encryption with unique per-entry nonce
+- Optional HMAC verification for cross-check
+- KDF-based key derivation from password using PBKDF2
+- Versioned `.gbtoken` format (`GBT4|<salt>|<nonce>|<ciphertext>|<tag>`) for future-proofing
+- Automatic secure deletion of sensitive data from RAM
+- Misuse-resistant API: users cannot provide weak keys or nonce manually
+- Multi-bot support: store multiple bot tokens in one `.gbtoken` file
+- Retry/lockout system: failed decrypt attempts tracked with persistent storage
 
-### 1️⃣ Context-aware Message Encryption
+**Example:**  
 
-- Encrypt messages with additional metadata such as `chat_id`, `message_id`, and `timestamp`.  
-- Prevents replay attacks and ensures message security for each unique context.
-
-**Example:**
 ```python
+from gbkomi import GBKomi, AESDecryptionError, HMACVerificationError
+
+password = b"supersecurepassword"
+gb = GBKomi(password)
+
+# Encrypt token for Telegram bot
+bot_tokens = {"bot1": "123456:ABC-DEF", "bot2": "654321:DEF-ABC"}
+gb.save_to_file(".gbtoken", bot_tokens, associated_data=b"multi-bot")
+
+# Decrypt with retry protection
+try:
+    tokens = gb.load_from_file(".gbtoken", associated_data=b"multi-bot")
+    bot1_token = tokens["bot1"]
+except (AESDecryptionError, HMACVerificationError) as e:
+    print("Decryption failed:", e)
+2️⃣ Secure Logging for Bots (.gblog)
+Each log entry encrypted individually with AES-GCM + HMAC
+
+Associated data (bot ID or context) ensures tamper detection
+
+Optional persistent retry/block counter for failed decrypt attempts
+
+Replay-attack prevention with UUID + timestamp per log entry
+
+Multi-bot support: separate log files per bot (bot1.gblog, bot2.gblog)
+
+Secure append-only logging and optional clearing
+
+Example:
+
+from gbkomi import GBLog
+
+log_password = b"anothersecurepass"
+log = GBLog(log_password, retry_file=".retry_store.json")
+
+log.append_log("bot1.gblog", "Bot token loaded successfully", associated_data=b"bot1")
+entries = log.read_logs("bot1.gblog", associated_data=b"bot1")
+print(entries)
+3️⃣ Context-Aware Message Encryption
+Encrypt messages with metadata: chat_id, message_id, timestamp
+
+Prevents replay attacks
+
+AEAD encryption ensures integrity
+
 from gbkomi import context_encrypt, context_decrypt, generate_secure_key
 
 key = generate_secure_key()
@@ -26,28 +76,28 @@ context = {"chat_id": 12345, "message_id": 678, "timestamp": 1700000000}
 cipher = context_encrypt(message, key, context)
 plain = context_decrypt(cipher, key, context)
 print(plain.decode())
-2️⃣ Streaming Secure File Encryption
-Encrypt and decrypt large files efficiently without loading them fully into memory.
+4️⃣ Streaming File Encryption
+Encrypt large files chunk by chunk (>100MB)
 
-Supports files >100MB.
+Low memory footprint
 
-Example:
+AES-GCM with unique nonce per file
 
-from gbkomi import encrypt_file_stream, decrypt_file_stream, generate_secure_key
+from gbkomi import encrypt_file_stream, decrypt_file_stream
 
 key = generate_secure_key()
 encrypt_file_stream("video.mp4", "video.enc", key)
 decrypt_file_stream("video.enc", "video_decoded.mp4", key)
-3️⃣ Secure Database Layer
-Store all database records securely using AES-256-GCM and HMAC verification.
+5️⃣ Secure Database Storage
+Store JSON-compatible data securely
 
-Works with SQLite, PostgreSQL, and MySQL.
+AES-GCM + HMAC verification
 
-Tamper-proof and safe even if the database is compromised.
+Tamper-proof even if database is compromised
 
-Example:
+Works with SQLite, PostgreSQL, MySQL
 
-from gbkomi import db_encrypt, db_decrypt, generate_secure_key
+from gbkomi import db_encrypt, db_decrypt
 
 key = generate_secure_key()
 data = {"balance": 1000, "settings": {"theme": "dark"}}
@@ -55,86 +105,47 @@ data = {"balance": 1000, "settings": {"theme": "dark"}}
 cipher = db_encrypt(data, key)
 plain = db_decrypt(cipher, key)
 print(plain)
-4️⃣ Secure Telegram Bot Token Management
-.gbtoken file replaces .env for secure bot token storage.
+6️⃣ Telegram Bot Security Features
+Multi-bot support in a single .gbtoken
 
-Encrypted with AES-256-GCM and verified with HMAC.
+Context-aware: token usage bound to bot or session
 
-Context-aware: tokens can be limited per project/user.
+Secure rotation of bot tokens without data loss
 
-Example:
+Retry/lockout system prevents brute-force attempts
 
-from gbkomi import gbtoken_create, gbtoken_read, generate_secure_key
+Optional auto key rotation
 
-key = generate_secure_key()
-gbtoken_create(".gbtoken", key, {"telegram_bot_token": "123456:ABC-DEF"})
+Secure logging via .gblog tied to bot context
 
-tokens = gbtoken_read(".gbtoken", key)
-bot_token = tokens["telegram_bot_token"]
-print(bot_token)
 🔹 Installation
-pip install gbkomi==1.4.1
-🔹 Using gbkomi with a Telegram Bot (Step-by-Step)
-1️⃣ Create a project folder
-mkdir gbkomi_bot_demo
-cd gbkomi_bot_demo
-2️⃣ Set up a Python environment
-python -m venv venv
-venv\Scripts\activate      # Windows
-source venv/bin/activate   # Linux / Mac
-pip install gbkomi telebot
-3️⃣ Create .gbtoken securely
-from gbkomi import gbtoken_create, generate_secure_key
-
-key = generate_secure_key()
-bot_token = input("Enter your Telegram Bot Token: ")
-gbtoken_create(".gbtoken", key, {"telegram_bot_token": bot_token})
-The .gbtoken file is encrypted and tamper-proof.
-
-Store key securely — without it, the bot token cannot be read.
-
-4️⃣ Build a secure Telegram bot
-Use telebot (PyTelegramBotAPI) and gbkomi functions.
-
-Encrypt user messages with context_encrypt.
-
-Store encrypted messages in a secure database with db_encrypt.
-
-Encrypt large files sent by users with encrypt_file_stream.
-
-Example Bot Skeleton:
-
-import telebot
-from gbkomi import gbtoken_read, context_encrypt, context_decrypt, db_encrypt, db_decrypt, generate_secure_key
-
-key = open("data/key.bin", "rb").read()
-tokens = gbtoken_read(".gbtoken", key)
-BOT_TOKEN = tokens["telegram_bot_token"]
-bot = telebot.TeleBot(BOT_TOKEN)
-
-db = {}
-
-@bot.message_handler(commands=["start"])
-def start(msg):
-    bot.send_message(msg.chat.id, "Welcome to gbkomi secure bot!")
-Full example with all features is available in the gbkomi_bot_demo repository.
-
-🔹 Security Notes
-Always protect your encryption key — without it, .gbtoken and encrypted data are inaccessible.
-
-.gbtoken is much more secure than .env; even if the file is leaked, data is encrypted.
-
-Rotate keys periodically for long-term deployments.
-
+pip install gbkomi==1.4.2
 🔹 Supported Python Versions
 Python 3.8+
 
-Tested on Python 3.11
+Tested on 3.11
 
-🔹 License
-MIT License
+🔹 Best Practices
+Always provide associated_data when encrypting tokens or logs.
 
-🔹 Summary
-gbkomi v1.4.1 provides industrial-strength encryption, context-aware message protection, secure file and database storage, and an advanced Telegram bot token management system.
+Store .gbtoken and .gblog securely on disk; never commit passwords or tokens to GitHub.
 
-Perfect for projects where security and reliability are critical.
+Use long, random passwords for key derivation.
+
+Regularly rotate bot tokens and encryption keys.
+
+For production bots, enable monitoring on retry/block events.
+
+🔹 Versioning Notes
+.gbtoken format: GBT4|<salt>|<nonce>|<ciphertext>|<tag>
+
+.gblog format: GBL2|<salt>|<nonce>|<ciphertext>|<tag>
+
+Future versions will maintain backward compatibility via version headers.
+
+🔹 Optional Advanced Features
+Hardware-backed keys (HSM, TPM, secure enclave)
+
+Encrypted configuration files for webhooks or bot settings (.gbconfig)
+
+Multi-threaded log reading for very large log files
